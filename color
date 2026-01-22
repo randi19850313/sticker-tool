@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>麵麵貼圖修補工具</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 900px; width: 100%; }
+        .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        #canvas-box { background: #fff; border: 2px solid #ddd; overflow: auto; display: flex; justify-content: center; }
+        canvas { cursor: crosshair; background-image: linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee 100%), linear-gradient(45deg, #eee 25%, white 25%, white 75%, #eee 75%, #eee 100%); background-size: 20px 20px; background-position: 0 0, 10px 10px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #4285f4; color: white; }
+        .btn-eraser { background: #ea4335; color: white; }
+        .color-preview { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #333; }
+        #result-area { margin-top: 20px; text-align: center; display: none; }
+        #result-img { max-width: 100%; border: 2px solid #34a853; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h3>🐱 麵麵貼圖修補工具 (安全版)</h3>
+    <div class="toolbar">
+        <input type="file" id="up" accept="image/*">
+        <button id="mDraw" class="btn btn-primary">🖊️ 畫筆</button>
+        <button id="mEraser" class="btn btn-eraser">🧽 橡皮擦</button>
+        <div class="color-preview" id="cp"></div>
+        <label>大小:</label>
+        <input type="range" id="bSize" min="1" max="100" value="10">
+        <button id="genBtn" class="btn" style="background:#34a853; color:white;">完成並產生圖片</button>
+    </div>
+
+    <div id="canvas-box">
+        <canvas id="c"></canvas>
+    </div>
+
+    <div id="result-area">
+        <p>✅ 處理完成！請在下方圖片上按<b>「右鍵 -> 另存圖片」</b>保存：</p>
+        <img id="result-img">
+    </div>
+
+    <p style="font-size: 13px; color: #666;">
+        💡 提示：按住 <b>Alt + 點擊</b> 圖片可取色。完成後點擊綠色按鈕手動儲存圖片，避免系統攔截。
+    </p>
+</div>
+
+<script>
+    const up = document.getElementById('up'), c = document.getElementById('c'), ctx = c.getContext('2d');
+    const cp = document.getElementById('cp'), bSize = document.getElementById('bSize');
+    const genBtn = document.getElementById('genBtn'), resArea = document.getElementById('result-area'), resImg = document.getElementById('result-img');
+    const mDraw = document.getElementById('mDraw'), mEraser = document.getElementById('mEraser');
+
+    let isPainting = false, color = "#D9B681", mode = 'draw';
+    cp.style.background = color;
+
+    up.onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                c.width = img.width; c.height = img.height;
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    mDraw.onclick = () => { mode = 'draw'; mDraw.style.outline = "3px solid #000"; mEraser.style.outline = "none"; };
+    mEraser.onclick = () => { mode = 'eraser'; mEraser.style.outline = "3px solid #000"; mDraw.style.outline = "none"; };
+    mDraw.click();
+
+    c.onmousedown = (e) => {
+        if (e.altKey) { pick(e); return; }
+        isPainting = true;
+        draw(e);
+    };
+    window.onmousemove = (e) => draw(e);
+    window.onmouseup = () => { isPainting = false; ctx.beginPath(); };
+
+    function pick(e) {
+        const r = c.getBoundingClientRect();
+        const x = (e.clientX - r.left) * (c.width / r.width);
+        const y = (e.clientY - r.top) * (c.height / r.height);
+        const p = ctx.getImageData(x, y, 1, 1).data;
+        color = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
+        cp.style.background = color;
+    }
+
+    function draw(e) {
+        if (!isPainting || e.altKey) return;
+        const r = c.getBoundingClientRect();
+        const x = (e.clientX - r.left) * (c.width / r.width);
+        const y = (e.clientY - r.top) * (c.height / r.height);
+
+        ctx.lineWidth = bSize.value;
+        ctx.lineCap = "round";
+
+        if (mode === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = color;
+        }
+
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    }
+
+    // 安全的圖片產生邏輯
+    genBtn.onclick = () => {
+        resImg.src = c.toDataURL("image/png");
+        resArea.style.display = "block";
+        window.scrollTo(0, document.body.scrollHeight);
+    };
+</script>
+</body>
+</html>
